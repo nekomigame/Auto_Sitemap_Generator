@@ -1,0 +1,7 @@
+.venv/
+save/
+
+sitemap_*.md
+*.csv
+
+config.json

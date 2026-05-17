@@ -1,0 +1,23 @@
+[
+    {
+        "target_urls": [
+            "https://example.com/"
+        ],
+        "base_url": [
+            "https://example.com/"
+        ],
+        "max_depth": 10,
+        "max_concurrent": 5
+    },
+    {
+        "target_urls": [
+            "https://example.com/test1/",
+            "https://example.com/test2/"
+        ],
+        "base_url": [
+            "https://example.com/test1/"
+        ],
+        "max_depth": 10,
+        "max_concurrent": 5
+    }
+]
