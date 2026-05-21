@@ -2,6 +2,7 @@ import os
 import glob
 import re
 import csv
+from urllib.parse import unquote
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -51,8 +52,10 @@ def parse_sitemap_md(file_path):
             
             # URLの組み立て
             full_path = "/".join(path_stack)
-            urls.append(f"{base_url}/{full_path}/")
-
+            decoded_text = unquote(f"{base_url}/{full_path}")
+            urls.append(decoded_text)
+        
+    urls.sort()
     return urls
 
 def main():

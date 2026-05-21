@@ -5,6 +5,7 @@ from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from collections import defaultdict
+from urllib.parse import unquote
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
@@ -74,12 +75,12 @@ class SitemapCrawler:
                     continue
                 
                 self.visited.add(current_url)
-                self.build_tree_path(current_url)
+                self.build_tree_path(unquote(current_url))
 
                 if depth < self.max_depth:
                     self.active_tasks += 1
                     remaining = self.queue.qsize()
-                    print(f"取得中 [残り: {remaining:3} / 並列: {self.active_tasks:2} / 重複スキップ: {self.duplicate_count:3}]: {current_url} (深さ: {depth})")
+                    print(f"取得中 [残り: {remaining:3} / 並列: {self.active_tasks:2} / 重複スキップ: {self.duplicate_count:3}]: {unquote(current_url)} (深さ: {depth})")
                     
                     # ページ取得
                     page = await browser_context.new_page()
