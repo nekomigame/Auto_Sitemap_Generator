@@ -8,11 +8,9 @@ from urllib.parse import urljoin, urlparse
 from collections import defaultdict
 from urllib.parse import unquote
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
 
 # 再帰的な辞書（ツリー構造）を作成するためのヘルパー関数
-
-
 def tree():
     return defaultdict(tree)
 
@@ -375,7 +373,8 @@ def print_tree(t, indent=""):
 
 def save_to_file(domain, result_tree, visited_count, duplicate_count):
     filename = f"sitemap_{domain.replace('.', '_')}.md"
-    savedir = "save/"
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    savedir = os.path.join(BASE_DIR, "save")
     if not os.path.exists(savedir):
         os.makedirs(savedir)
     filename = os.path.join(savedir, filename)
@@ -399,7 +398,9 @@ async def main():
     # ==========================================
     # 設定
     # ==========================================
-    with open("config.json", "r") as f:
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(BASE_DIR, "config.json")
+    with open(config_path, "r", encoding="utf-8") as f:
         configs = json.load(f)
 
     for config in configs:
