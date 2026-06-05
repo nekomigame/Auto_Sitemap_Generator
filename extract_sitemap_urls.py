@@ -52,7 +52,7 @@ def parse_sitemap_md(file_path):
             
             # URLの組み立て
             full_path = "/".join(path_stack)
-            decoded_text = unquote(f"{base_url}/{full_path}")
+            decoded_text = unquote(f"{base_url}/{full_path} ")
             urls.append(decoded_text)
         
     urls.sort()
