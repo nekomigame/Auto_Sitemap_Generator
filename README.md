@@ -35,8 +35,13 @@
    .venv\Scripts\activate
    # macOS/Linuxの場合
    source .venv/bin/activate
-
+   
+   # uvのpipを使う場合
    uv pip install playwright beautifulsoup4
+   # uvでインストール
+   uv add playwright beautifulsoup4
+
+   # ブラウザのインストール
    uv run playwright install chromium
    ```
 
