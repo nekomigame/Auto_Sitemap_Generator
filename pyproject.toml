@@ -6,5 +6,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "beautifulsoup4>=4.14.3",
+    "black>=26.5.1",
     "playwright>=1.60.0",
 ]
+
+[tool.black]
+target-version = ['py310']
