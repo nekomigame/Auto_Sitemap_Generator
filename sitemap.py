@@ -79,7 +79,7 @@ class SitemapCrawler:
 
     def extract_links(self, html, base_url):
         # htmlからurlを抜き出す
-        soup = BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, "lxml")
         extracted = set()
         for a in soup.find_all("a", href=True):
             full_url = urljoin(base_url, a["href"])
@@ -170,6 +170,11 @@ class SitemapCrawler:
 
                             # ページ取得
                             page = await browser_context.new_page()
+                            await page.route(
+                                "**/*",
+                                lambda route: route.continue_() if route.request.resource_type in [
+                                    "document", "script"] else route.abort()
+                            )
                             try:
                                 success = False
                                 retry_count = 0
