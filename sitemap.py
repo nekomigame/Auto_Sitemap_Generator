@@ -25,7 +25,7 @@ class SitemapCrawler:
         else:
             self.start_urls = start_urls
 
-        self.max_depth = max_depth
+        self.max_depth = max_depth # 最大の深さ
         self.domain = urlparse(self.start_urls[0]).netloc
 
         if not base_urls:
@@ -51,6 +51,7 @@ class SitemapCrawler:
         self.rate_limit_event.set()  # 初期状態は「一時停止なし（シグナルON）」
 
     def extract_links(self, html, base_url):
+        # htmlからurlを抜き出す 
         soup = BeautifulSoup(html, 'html.parser')
         extracted = set()
         for a in soup.find_all('a', href=True):
@@ -213,6 +214,7 @@ class SitemapCrawler:
     async def crawl(self):
         print(
             f"[{self.domain}] のサイトマップを作成中...(並列数: {self.max_concurrent}, 最大深さ: {self.max_depth})")
+        print(f"遅延：{self.request_delay}, レートリミット待機時間: {self.backoff_delay}")
 
         # 初期URLをキューに追加
         for url in self.start_urls:
