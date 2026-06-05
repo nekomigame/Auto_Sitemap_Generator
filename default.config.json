@@ -7,7 +7,9 @@
             "https://example.com/"
         ],
         "max_depth": 10,
-        "max_concurrent": 5
+        "max_concurrent": 5,
+        "request_delay":1.5,
+        "backoff_delay":30
     },
     {
         "target_urls": [

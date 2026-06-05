@@ -56,7 +56,9 @@
         "target_urls": ["https://example.com/"],
         "base_urls": ["https://example.com/"],
         "max_depth": 5,
-        "max_concurrent": 5
+        "max_concurrent": 5,
+        "request_delay":1.5,
+        "backoff_delay":30
     }
 ]
 ```
