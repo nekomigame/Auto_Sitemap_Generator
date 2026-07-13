@@ -33,20 +33,48 @@
    cd Auto_Sitemap_Generator
    ```
 
-2. **依存ライブラリのインストールと環境構築**
-   `pyproject.toml` が配置されているため、以下のコマンドで環境構築とパッケージのインストールが一括で行えます。
+2. **依存ライブラリのインストールと環境構築**  
+
+   ### 方法A: `uv` を使用する場合（推奨）
+   `pyproject.toml` が用意されているため、以下のコマンドで仮想環境の作成と依存関係のインストールが一括で行えます。
+
    ```bash
-   # 仮想環境の作成と依存関係のインストールを一括で行う
+   # 仮想環境の作成と依存関係のインストール
    uv sync
 
-   # 仮想環境の有効化（必要に応じて）
+   # クロールに必要なブラウザ（Chromium）のインストール
+   uv run playwright install chromium
+   ```
+
+   仮想環境を有効化して操作したい場合は、以下のコマンドを実行してください。
+   ```bash
    # Windowsの場合
    .venv\Scripts\activate
    # macOS/Linuxの場合
    source .venv/bin/activate
+   ```
+
+   ### 方法B: 通常の `pip` を使用する場合
+   `requirements.txt` を使用して通常の仮想環境を作成し、ライブラリをインストールします。
+
+   ```bash
+   # 仮想環境の作成
+   # Windowsの場合
+   python -m venv venv
+   # macOS/Linuxの場合
+   python3 -m venv venv
+
+   # 仮想環境の有効化
+   # Windowsの場合
+   venv\Scripts\activate
+   # macOS/Linuxの場合
+   source venv/bin/activate
+
+   # 依存ライブラリのインストール
+   pip install -r requirements.txt
 
    # クロールに必要なブラウザ（Chromium）のインストール
-   uv run playwright install chromium
+   playwright install chromium
    ```
 
 ## 使い方
@@ -79,6 +107,10 @@
 Webサイトをクロールし、`save/` ディレクトリ内にMarkdown形式のサイトマップを出力します。
 
 ```bash
+# 仮想環境を有効化していない場合
+uv run sitemap.py
+
+# 仮想環境を有効化している場合
 python sitemap.py
 ```
 
@@ -86,6 +118,10 @@ python sitemap.py
 `save/` ディレクトリ内のすべての `sitemap_*.md` ファイルを自動で解析し、抽出したURLをアルファベット順にソート・デコードした上で、同名のCSVファイル（`sitemap_*.csv`）として一括出力します。
 
 ```bash
+# 仮想環境を有効化していない場合
+uv run extract_sitemap_urls.py
+
+# 仮想環境を有効化している場合
 python extract_sitemap_urls.py
 ```
 
@@ -104,7 +140,11 @@ python extract_sitemap_urls.py
 ├── extract_sitemap_urls.py   # URL抽出・CSV変換スクリプト
 ├── config.json               # 実行設定ファイル（ユーザー作成）
 ├── default.config.json       # 設定ファイルのサンプル
+├── requirements.txt          # 依存ライブラリのリスト
+├── pyproject.toml            # uv環境構築用の依存関係リスト
+├── uv.lock                   # uv環境構築用の依存関係リストのロック
 ├── save/                     # 生成されたファイルの保存先
+├── markdown/                 # 生成されたページの保存先（markdown形式）
 └── README.md                 # 本ドキュメント
 ```
 
