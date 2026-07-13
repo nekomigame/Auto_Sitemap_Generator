@@ -2,11 +2,14 @@ import os
 import json
 import asyncio
 import random
+import hashlib
+import tempfile
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 from collections import defaultdict
 from urllib.parse import unquote
+from markitdown import MarkItDown
 
 
 
@@ -26,6 +29,7 @@ class SitemapCrawler:
         max_concurrent=5,
         request_delay=1.5,
         backoff_delay=30,
+        markdown_mode=False,
     ):
         # 開始するURL
         if isinstance(start_urls, str):
@@ -54,6 +58,7 @@ class SitemapCrawler:
         # 負荷軽減・レートリミット用の変数
         self.request_delay = request_delay  # リクエスト間のデフォルト遅延時間（秒）
         self.backoff_delay = backoff_delay  # レートリミット検知時の待機時間（秒）
+        self.markdown_mode = markdown_mode
         self.rate_limit_lock = asyncio.Lock()  # 重複して待機処理に入るのを防ぐロック
         self.rate_limit_event = (
             asyncio.Event()
@@ -131,6 +136,42 @@ class SitemapCrawler:
 
             self.rate_limit_event.set()  # イベントをセットして全ワーカーを再稼働
 
+    async def save_markdown(self, url, html_content):
+        def _convert_and_save():
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+            md_dir = os.path.join(BASE_DIR, "markdown")
+            if not os.path.exists(md_dir):
+                os.makedirs(md_dir, exist_ok=True)
+            
+            parsed = urlparse(url)
+            path = parsed.path.strip("/")
+            safe_name = path.replace("/", "_")[:50]
+            if not safe_name:
+                safe_name = "index"
+            hashed = hashlib.md5(url.encode('utf-8')).hexdigest()[:8]
+            filename = f"{safe_name}_{hashed}.md"
+            md_path = os.path.join(md_dir, filename)
+
+            try:
+                with tempfile.NamedTemporaryFile("w", encoding="utf-8", suffix=".html", delete=False) as tmp:
+                    tmp.write(html_content)
+                    tmp_path = tmp.name
+                
+                md = MarkItDown()
+                result = md.convert(tmp_path)
+                
+                with open(md_path, "w", encoding="utf-8") as f:
+                    f.write(result.text_content)
+                
+                os.remove(tmp_path)
+                print(f"[Markdown保存] {md_path}")
+            except Exception as e:
+                print(f"[Markdown保存エラー] {url}: {e}")
+                if 'tmp_path' in locals() and os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+
+        await asyncio.to_thread(_convert_and_save)
+
     async def worker(self, browser_context):
         """並列実行されるワーカー"""
         while not getattr(self, "_stop_requested", False):
@@ -170,11 +211,12 @@ class SitemapCrawler:
 
                             # ページ取得
                             page = await browser_context.new_page()
-                            await page.route(
-                                "**/*",
-                                lambda route: route.continue_() if route.request.resource_type in [
-                                    "document", "script"] else route.abort()
-                            )
+                            if not self.markdown_mode:
+                                await page.route(
+                                    "**/*",
+                                    lambda route: route.continue_() if route.request.resource_type in [
+                                        "document", "script"] else route.abort()
+                                )
                             try:
                                 success = False
                                 retry_count = 0
@@ -232,6 +274,9 @@ class SitemapCrawler:
 
                                         # 正常にページが取得できたら成功とする
                                         success = True
+
+                                        if self.markdown_mode:
+                                            await self.save_markdown(current_url, html_content)
 
                                         # ページ内のURLを取得
                                         links = self.extract_links(
@@ -422,6 +467,8 @@ async def main():
             REQUEST_DELAY = config.get("request_delay", 1.5)
             # レートリミット検知時の待機時間 (秒)
             BACKOFF_DELAY = config.get("backoff_delay", 30)
+            # マークダウン保存モード
+            MARKDOWN_MODE = config.get("markdown_mode", False)
 
         except KeyError as e:
             print(e)
@@ -436,6 +483,7 @@ async def main():
             max_concurrent=MAX_CONCURRENT,
             request_delay=REQUEST_DELAY,
             backoff_delay=BACKOFF_DELAY,
+            markdown_mode=MARKDOWN_MODE,
         )
 
         # クローリング開始

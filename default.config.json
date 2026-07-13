@@ -9,7 +9,8 @@
         "max_depth": 10,
         "max_concurrent": 5,
         "request_delay":1.5,
-        "backoff_delay":30
+        "backoff_delay":30,
+        "markdown_mode":false
     },
     {
         "target_urls": [

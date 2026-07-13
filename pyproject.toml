@@ -8,6 +8,7 @@ dependencies = [
     "beautifulsoup4>=4.14.3",
     "black>=26.5.1",
     "lxml>=6.1.1",
+    "markitdown>=0.1.6",
     "playwright>=1.60.0",
 ]
 
