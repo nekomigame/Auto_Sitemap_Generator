@@ -101,7 +101,7 @@ python extract_sitemap_urls.py
 ```
 .
 ├── sitemap.py                # クローラー本体
-├── extract_sitemap_urls.py    # URL抽出・CSV変換スクリプト
+├── extract_sitemap_urls.py   # URL抽出・CSV変換スクリプト
 ├── config.json               # 実行設定ファイル（ユーザー作成）
 ├── default.config.json       # 設定ファイルのサンプル
 ├── save/                     # 生成されたファイルの保存先
