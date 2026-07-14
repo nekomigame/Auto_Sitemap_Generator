@@ -12,7 +12,8 @@
 - **ツリー構造の可視化**: ディレクトリ階層を `├──` や `└──` を用いたテキスト形式で出力し、サイト構成を直感的に把握できます。
 - **URL抽出機能**: 生成されたMarkdownからURLのみを抽出し、CSV形式で保存できます。
 - **ページをMarkdownに保存**: 取得したページをMarkdown形式で保存できます。
-- **柔軟なカスタマイズ**: `config.json` を編集することで、探索の深さや並列数、ディレイ時間、クロール対象のフィルタリングを自由に変更可能です。
+- **高度なステルス機能（Scrapling統合）**: 最新のスクレイピングフレームワーク `Scrapling` とパッチ適用済みブラウザ（`patchright`）を使用した `AsyncStealthySession` によるクロールに対応。Cloudflareなどのボット防御システムを効果的に回避します。
+- **柔軟なカスタマイズ**: `config.json` を編集することで、探索の深さや並列数、ディレイ時間、クロール対象のフィルタリング、ステルスモードのON/OFFを自由に変更可能です。
 
 ## 必要条件
 
@@ -42,8 +43,11 @@
    # 仮想環境の作成と依存関係のインストール
    uv sync
 
-   # クロールに必要なブラウザ（Chromium）のインストール
-   uv run playwright install chromium
+    # クロールに必要なブラウザ（Chromium）のインストール
+    uv run playwright install chromium
+
+    # ステルスモードに必要なパッチ適用済みブラウザのインストール
+    uv run patchright install
    ```
 
    仮想環境を有効化して操作したい場合は、以下のコマンドを実行してください。
@@ -73,8 +77,11 @@
    # 依存ライブラリのインストール
    pip install -r requirements.txt
 
-   # クロールに必要なブラウザ（Chromium）のインストール
-   playwright install chromium
+    # クロールに必要なブラウザ（Chromium）のインストール
+    playwright install chromium
+
+    # ステルスモードに必要なパッチ適用済みブラウザのインストール
+    patchright install
    ```
 
 ## 使い方
@@ -91,7 +98,8 @@
         "max_concurrent": 5,
         "request_delay":1.5,
         "backoff_delay":30,
-        "markdown_mode":false
+        "markdown_mode":false,
+        "stealth_mode":false
     }
 ]
 ```
@@ -102,6 +110,7 @@
 - `request_delay`: リクエスト間のデフォルト遅延時間（秒）。ジッター処理によりこの時間の 70%〜130% の範囲でランダムに変動します。
 - `backoff_delay`: アクセス制限（レートリミット等）を検知した際の、全ワーカーの一時停止待機時間（秒）。
 - `markdown_mode`:取得したページをmarkdownに保存するモード。デフォルトは無効。
+- `stealth_mode`: `Scrapling` を使用した高度なステルス機能を有効にするモード。デフォルトは無効（`false`）。有効にするとCloudflare等の保護を自動で突破しやすくなります。
 
 ### 2. クロールの実行 (`sitemap.py`)
 Webサイトをクロールし、`save/` ディレクトリ内にMarkdown形式のサイトマップを出力します。
