@@ -10,6 +10,7 @@ dependencies = [
     "lxml>=6.1.1",
     "markitdown>=0.1.6",
     "playwright>=1.60.0",
+    "scrapling[all]>=0.4.11",
 ]
 
 [tool.black]

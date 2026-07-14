@@ -30,6 +30,7 @@ class SitemapCrawler:
         request_delay=1.5,
         backoff_delay=30,
         markdown_mode=False,
+        stealth_mode=False,
     ):
         # 開始するURL
         if isinstance(start_urls, str):
@@ -59,6 +60,7 @@ class SitemapCrawler:
         self.request_delay = request_delay  # リクエスト間のデフォルト遅延時間（秒）
         self.backoff_delay = backoff_delay  # レートリミット検知時の待機時間（秒）
         self.markdown_mode = markdown_mode
+        self.stealth_mode = stealth_mode
         self.rate_limit_lock = asyncio.Lock()  # 重複して待機処理に入るのを防ぐロック
         self.rate_limit_event = (
             asyncio.Event()
@@ -337,50 +339,78 @@ class SitemapCrawler:
         print(
             f"遅延：{self.request_delay}, レートリミット待機時間: {self.backoff_delay}"
         )
+        if self.stealth_mode:
+            print("[Scrapling] 高度なステルス機能を有効にしてクローリングを実行します。")
 
         # 初期URLをキューに追加
         for url in self.start_urls:
             self.seen.add(url)
             await self.queue.put((url, 0))
 
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
-
-            # 指定された並列数分のワーカーを起動
-            workers = [
-                asyncio.create_task(self.worker(context))
-                for _ in range(self.max_concurrent)
-            ]
-
-            try:
-                # 全てのタスクが完了するのを待つ
-                # KeyboardInterruptを確実に捕捉できるよう、タイムアウトを挟んで待機
-                join_task = asyncio.create_task(self.queue.join())
-                while not join_task.done():
-                    await asyncio.wait([join_task], timeout=1.0)
-                    if getattr(self, "_stop_requested", False):
-                        break
-
-            except KeyboardInterrupt:
-                print(
-                    "\n[中断検知] クローリングを強制停止しています。少々お待ちください..."
-                )
-                self.interrupted = True
-                self.stop()
-            finally:
-                # ワーカーを停止
-                self.stop()
-                for w in workers:
-                    if not w.done():
-                        w.cancel()
+        if self.stealth_mode:
+            from scrapling.fetchers import AsyncStealthySession
+            async with AsyncStealthySession(headless=True) as session:
+                context = session.context
+                workers = [
+                    asyncio.create_task(self.worker(context))
+                    for _ in range(self.max_concurrent)
+                ]
 
                 try:
-                    await browser.close()
-                except Exception:
-                    pass
+                    join_task = asyncio.create_task(self.queue.join())
+                    while not join_task.done():
+                        await asyncio.wait([join_task], timeout=1.0)
+                        if getattr(self, "_stop_requested", False):
+                            break
+
+                except KeyboardInterrupt:
+                    print("\n[中断検知] クローリングを強制停止しています。少々お待ちください...")
+                    self.interrupted = True
+                    self.stop()
+                finally:
+                    self.stop()
+                    for w in workers:
+                        if not w.done():
+                            w.cancel()
+        else:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                context = await browser.new_context(
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                )
+
+                # 指定された並列数分のワーカーを起動
+                workers = [
+                    asyncio.create_task(self.worker(context))
+                    for _ in range(self.max_concurrent)
+                ]
+
+                try:
+                    # 全てのタスクが完了するのを待つ
+                    # KeyboardInterruptを確実に捕捉できるよう、タイムアウトを挟んで待機
+                    join_task = asyncio.create_task(self.queue.join())
+                    while not join_task.done():
+                        await asyncio.wait([join_task], timeout=1.0)
+                        if getattr(self, "_stop_requested", False):
+                            break
+
+                except KeyboardInterrupt:
+                    print(
+                        "\n[中断検知] クローリングを強制停止しています。少々お待ちください..."
+                    )
+                    self.interrupted = True
+                    self.stop()
+                finally:
+                    # ワーカーを停止
+                    self.stop()
+                    for w in workers:
+                        if not w.done():
+                            w.cancel()
+
+                    try:
+                        await browser.close()
+                    except Exception:
+                        pass
 
         return self.sitemap_tree
 
@@ -451,6 +481,8 @@ async def main():
             BACKOFF_DELAY = config.get("backoff_delay", 30)
             # マークダウン保存モード
             MARKDOWN_MODE = config.get("markdown_mode", False)
+            # ステルスモード
+            STEALTH_MODE = config.get("stealth_mode", False)
 
         except KeyError as e:
             print(e)
@@ -466,6 +498,7 @@ async def main():
             request_delay=REQUEST_DELAY,
             backoff_delay=BACKOFF_DELAY,
             markdown_mode=MARKDOWN_MODE,
+            stealth_mode=STEALTH_MODE,
         )
 
         # クローリング開始
