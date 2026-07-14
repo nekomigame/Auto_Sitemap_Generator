@@ -200,8 +200,10 @@ class SitemapCrawler:
                     if current_url in self.visited or depth > self.max_depth:
                         continue
 
-                    self.visited.add(current_url)
-                    self.build_tree_path(unquote(current_url))
+                    if depth == self.max_depth:
+                        self.visited.add(current_url)
+                        self.build_tree_path(unquote(current_url))
+                        continue
 
                     if depth < self.max_depth:
                         self.active_tasks += 1
@@ -258,6 +260,8 @@ class SitemapCrawler:
 
                                         # 正常にページが取得できたら成功とする
                                         success = True
+                                        self.visited.add(current_url)
+                                        self.build_tree_path(unquote(current_url))
 
                                         if self.markdown_mode:
                                             await self.save_markdown(current_url, html_content)
@@ -303,6 +307,7 @@ class SitemapCrawler:
                                 raise
                             except Exception as e:
                                 print(f"エラー発生 ({current_url}): {e}")
+                                self.visited.add(current_url)
                             finally:
                                 await page.close()
                                 self.active_tasks -= 1
