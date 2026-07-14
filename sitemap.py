@@ -174,7 +174,7 @@ class SitemapCrawler:
 
         await asyncio.to_thread(_convert_and_save)
 
-    async def worker(self, browser_context):
+    async def worker(self, session_or_context):
         """並列実行されるワーカー"""
         while not getattr(self, "_stop_requested", False):
             try:
@@ -214,13 +214,16 @@ class SitemapCrawler:
                             )
 
                             # ページ取得
-                            page = await browser_context.new_page()
-                            if not self.markdown_mode:
-                                await page.route(
-                                    "**/*",
-                                    lambda route: route.continue_() if route.request.resource_type in [
-                                        "document", "script"] else route.abort()
-                                )
+                            if self.stealth_mode:
+                                page = None
+                            else:
+                                page = await session_or_context.new_page()
+                                if not self.markdown_mode:
+                                    await page.route(
+                                        "**/*",
+                                        lambda route: route.continue_() if route.request.resource_type in [
+                                            "document", "script"] else route.abort()
+                                    )
                             try:
                                 success = False
                                 retry_count = 0
@@ -235,19 +238,30 @@ class SitemapCrawler:
                                     await self.rate_limit_event.wait()
 
                                     try:
-                                        response = await page.goto(
-                                            current_url,
-                                            wait_until="domcontentloaded",
-                                            timeout=20000,
-                                        )
-                                        await asyncio.sleep(1)  # JS実行待ち
-
-                                        if response is None:
-                                            raise Exception("No response received from page.goto")
-
-                                        # ステータスコードの確認
-                                        status = response.status
-                                        html_content = await page.content()
+                                        if self.stealth_mode:
+                                            response = await session_or_context.fetch(
+                                                current_url,
+                                                timeout=20000,
+                                                disable_resources=not self.markdown_mode,
+                                                solve_cloudflare=True,
+                                                network_idle=True
+                                            )
+                                            await asyncio.sleep(1)  # JS実行待ち
+                                            if response is None:
+                                                raise Exception("No response received from session.fetch")
+                                            status = response.status
+                                            html_content = response.text
+                                        else:
+                                            response = await page.goto(
+                                                current_url,
+                                                wait_until="domcontentloaded",
+                                                timeout=20000,
+                                            )
+                                            await asyncio.sleep(1)  # JS実行待ち
+                                            if response is None:
+                                                raise Exception("No response received from page.goto")
+                                            status = response.status
+                                            html_content = await page.content()
 
                                         # レートリミット検知の判定
                                         is_rate_limited = status == 429
@@ -312,7 +326,8 @@ class SitemapCrawler:
                                 print(f"エラー発生 ({current_url}): {e}")
                                 self.visited.add(current_url)
                             finally:
-                                await page.close()
+                                if page:
+                                    await page.close()
                                 self.active_tasks -= 1
 
                                 # 負荷軽減のためのウェイト
@@ -358,9 +373,8 @@ class SitemapCrawler:
         if self.stealth_mode:
             from scrapling.fetchers import AsyncStealthySession
             async with AsyncStealthySession(headless=True) as session:
-                context = session.context
                 workers = [
-                    asyncio.create_task(self.worker(context))
+                    asyncio.create_task(self.worker(session))
                     for _ in range(self.max_concurrent)
                 ]
 
