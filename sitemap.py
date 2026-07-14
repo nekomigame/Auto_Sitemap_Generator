@@ -242,8 +242,11 @@ class SitemapCrawler:
                                         )
                                         await asyncio.sleep(1)  # JS実行待ち
 
+                                        if response is None:
+                                            raise Exception("No response received from page.goto")
+
                                         # ステータスコードの確認
-                                        status = response.status if response else None
+                                        status = response.status
                                         html_content = await page.content()
 
                                         # レートリミット検知の判定
