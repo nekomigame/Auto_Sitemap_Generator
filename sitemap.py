@@ -90,7 +90,7 @@ class SitemapCrawler:
         extracted = set()
         for a in soup.find_all("a", href=True):
             full_url = urljoin(base_url, a["href"])
-            clean_url = full_url.split("#")[0].split("?")[0]
+            clean_url = full_url.split("#")[0]
             if clean_url.startswith("http"):
                 extracted.add(clean_url)
         return extracted
