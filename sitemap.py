@@ -252,7 +252,7 @@ class SitemapCrawler:
                                             if response is None:
                                                 raise Exception("No response received from session.fetch")
                                             status = response.status
-                                            html_content = response.text
+                                            html_content = str(response.html_content)
                                         else:
                                             response = await page.goto(
                                                 current_url,
