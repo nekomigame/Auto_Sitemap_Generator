@@ -243,25 +243,7 @@ class SitemapCrawler:
                                         html_content = await page.content()
 
                                         # レートリミット検知の判定
-                                        is_rate_limited = False
-                                        if status == 429:
-                                            is_rate_limited = True
-                                        else:
-                                            # HTMLテキスト中に特定のアクセス制限エラーキーワードが含まれていないかチェック
-                                            lower_html = html_content.lower()
-                                            limit_keywords = [
-                                                "too many requests",
-                                                "too many access",
-                                                "rate limit",
-                                                "アクセス制限",
-                                                "アクセスが集中しています",
-                                                "一時的にアクセスを制限",
-                                            ]
-                                            if any(
-                                                kw in lower_html
-                                                for kw in limit_keywords
-                                            ):
-                                                is_rate_limited = True
+                                        is_rate_limited = status == 429
 
                                         if is_rate_limited:
                                             retry_count += 1
