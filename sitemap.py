@@ -71,6 +71,9 @@ class SitemapCrawler:
         self._stop_requested = False
         self.interrupted = False
 
+        if self.markdown_mode:
+            self.md = MarkItDown()
+
     def stop(self):
         """ワーカーを安全に停止するためのフラグ設定とキューのクリアを行う"""
         self._stop_requested = True
@@ -159,8 +162,7 @@ class SitemapCrawler:
                     tmp.write(html_content)
                     tmp_path = tmp.name
                 
-                md = MarkItDown()
-                result = md.convert(tmp_path)
+                result = self.md.convert(tmp_path)
                 
                 with open(md_path, "w", encoding="utf-8") as f:
                     f.write(result.text_content)
