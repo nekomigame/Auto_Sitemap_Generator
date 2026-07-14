@@ -11,7 +11,7 @@
         "request_delay":1.5,
         "backoff_delay":30,
         "markdown_mode":false,
-        "stealth_mode":true
+        "stealth_mode":false
     },
     {
         "target_urls": [
