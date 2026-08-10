@@ -1,6 +1,7 @@
 .venv/
 save/
 markdown/
+html/
 
 sitemap_*.md
 *.csv
