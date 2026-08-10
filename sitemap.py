@@ -530,6 +530,8 @@ async def main():
             BACKOFF_DELAY = config.get("backoff_delay", 30)
             # マークダウン保存モード
             MARKDOWN_MODE = config.get("markdown_mode", False)
+            # HTML保存モード
+            HTML_MODE = config.get("html_mode", False)
             # ステルスモード
             STEALTH_MODE = config.get("stealth_mode", False)
 
@@ -547,6 +549,7 @@ async def main():
             request_delay=REQUEST_DELAY,
             backoff_delay=BACKOFF_DELAY,
             markdown_mode=MARKDOWN_MODE,
+            html_mode=HTML_MODE,
             stealth_mode=STEALTH_MODE,
         )
 
