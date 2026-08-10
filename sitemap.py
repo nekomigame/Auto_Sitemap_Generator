@@ -90,15 +90,38 @@ class SitemapCrawler:
             except asyncio.QueueEmpty:
                 break
 
+    IGNORED_EXTENSIONS = (
+        ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico",
+        ".pdf", ".zip", ".tar", ".gz", ".rar", ".7z",
+        ".mp3", ".mp4", ".wav", ".avi", ".mov", ".webm",
+        ".css", ".js", ".json", ".xml", ".woff", ".woff2", ".ttf", ".eot"
+    )
+
     def extract_links(self, html, base_url):
         # htmlからurlを抜き出す
         soup = BeautifulSoup(html, "lxml")
         extracted = set()
         for a in soup.find_all("a", href=True):
-            full_url = urljoin(base_url, a["href"])
+            href = a["href"].strip()
+            if not href or href.startswith(("javascript:", "mailto:", "tel:", "#")):
+                continue
+            full_url = urljoin(base_url, href)
             clean_url = full_url.split("#")[0]
-            if clean_url.startswith("http"):
-                extracted.add(clean_url)
+            if not clean_url.startswith(("http://", "https://")):
+                continue
+
+            parsed = urlparse(clean_url)
+            # 非HTMLリソース（画像・ファイル等）を除外
+            if any(parsed.path.lower().endswith(ext) for ext in self.IGNORED_EXTENSIONS):
+                continue
+
+            # 末尾のスラッシュを統一（ルートパス以外は末尾スラッシュ除去）
+            path = parsed.path
+            if len(path) > 1 and path.endswith("/"):
+                path = path.rstrip("/")
+            normalized_url = parsed._replace(path=path).geturl()
+
+            extracted.add(normalized_url)
         return extracted
 
     def build_tree_path(self, url):
