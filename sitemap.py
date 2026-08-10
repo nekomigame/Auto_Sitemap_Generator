@@ -243,12 +243,13 @@ class SitemapCrawler:
                         self.queue.get(), timeout=1.0
                     )
                 except asyncio.TimeoutError:
-                    if self.active_tasks == 0:
+                    if self.active_tasks == 0 and self.queue.empty():
                         break
                     continue
                 except asyncio.CancelledError:
                     break
 
+                self.active_tasks += 1
                 try:
                     # 現在のURLはすでに訪れている、もしくは深さが指定した場合より深い場合はパスする
                     if current_url in self.visited or depth > self.max_depth:
@@ -260,147 +261,140 @@ class SitemapCrawler:
                         continue
 
                     if depth < self.max_depth:
-                        self.active_tasks += 1
+                        remaining = self.queue.qsize()
+                        print(
+                            f"取得中 [残り: {remaining:3} / 並列: {self.active_tasks:2} / 重複スキップ: {self.duplicate_count:3}]: {unquote(current_url)} (深さ: {depth})"
+                        )
+
+                        # ページ取得
+                        if self.stealth_mode:
+                            page = None
+                        else:
+                            page = await session_or_context.new_page()
+                            if not self.markdown_mode:
+                                await page.route(
+                                    "**/*",
+                                    lambda route: route.continue_() if route.request.resource_type in [
+                                        "document", "script"] else route.abort()
+                                )
                         try:
-                            remaining = self.queue.qsize()
-                            print(
-                                f"取得中 [残り: {remaining:3} / 並列: {self.active_tasks:2} / 重複スキップ: {self.duplicate_count:3}]: {unquote(current_url)} (深さ: {depth})"
-                            )
+                            success = False
+                            retry_count = 0
+                            max_retries = 3
 
-                            # ページ取得
-                            if self.stealth_mode:
-                                page = None
-                            else:
-                                page = await session_or_context.new_page()
-                                if not self.markdown_mode:
-                                    await page.route(
-                                        "**/*",
-                                        lambda route: route.continue_() if route.request.resource_type in [
-                                            "document", "script"] else route.abort()
-                                    )
-                            try:
-                                success = False
-                                retry_count = 0
-                                max_retries = 3
+                            while (
+                                not success
+                                and retry_count < max_retries
+                                and not getattr(self, "_stop_requested", False)
+                            ):
+                                # 処理開始直前にも一時停止中ではないか確認
+                                await self.rate_limit_event.wait()
 
-                                while (
-                                    not success
-                                    and retry_count < max_retries
-                                    and not getattr(self, "_stop_requested", False)
-                                ):
-                                    # 処理開始直前にも一時停止中ではないか確認
-                                    await self.rate_limit_event.wait()
-
-                                    try:
-                                        if self.stealth_mode:
-                                            response = await session_or_context.fetch(
-                                                current_url,
-                                                timeout=20000,
-                                                disable_resources=not self.markdown_mode,
-                                                solve_cloudflare=True,
-                                                network_idle=True
-                                            )
-                                            await asyncio.sleep(1)  # JS実行待ち
-                                            if response is None:
-                                                raise Exception("No response received from session.fetch")
-                                            status = response.status
-                                            html_content = str(response.html_content)
-                                        else:
-                                            response = await page.goto(
-                                                current_url,
-                                                wait_until="domcontentloaded",
-                                                timeout=20000,
-                                            )
-                                            await asyncio.sleep(1)  # JS実行待ち
-                                            if response is None:
-                                                raise Exception("No response received from page.goto")
-                                            status = response.status
-                                            html_content = await page.content()
-
-                                        # レートリミット検知の判定
-                                        is_rate_limited = status == 429
-
-                                        if is_rate_limited:
-                                            retry_count += 1
-                                            print(
-                                                f"[警告] レートリミット検知 ({retry_count}/{max_retries}回目試行): {unquote(current_url)}"
-                                            )
-                                            # 全ワーカーを止めて待機を実行する
-                                            await self.handle_rate_limit(current_url)
-                                            continue  # リトライループの先頭に戻って再試行
-
-                                        # 正常にページが取得できたら成功とする
-                                        success = True
-                                        self.visited.add(current_url)
-                                        self.build_tree_path(unquote(current_url))
-
-                                        if self.markdown_mode:
-                                            await self.save_markdown(current_url, html_content)
-                                        
-                                        if self.html_mode:
-                                            await self.save_html(current_url, html_content)
-
-                                        # ページ内のURLを取得
-                                        links = self.extract_links(
-                                            html_content, current_url
+                                try:
+                                    if self.stealth_mode:
+                                        response = await session_or_context.fetch(
+                                            current_url,
+                                            timeout=20000,
+                                            disable_resources=not self.markdown_mode,
+                                            solve_cloudflare=True,
+                                            network_idle=True
                                         )
-                                        for link in links:
-                                            matches_base = (not self.base_urls) or any(
-                                                link.startswith(b)
-                                                for b in self.base_urls
-                                            )
+                                        await asyncio.sleep(1)  # JS実行待ち
+                                        if response is None:
+                                            raise Exception("No response received from session.fetch")
+                                        status = response.status
+                                        html_content = str(response.html_content)
+                                    else:
+                                        response = await page.goto(
+                                            current_url,
+                                            wait_until="domcontentloaded",
+                                            timeout=20000,
+                                        )
+                                        await asyncio.sleep(1)  # JS実行待ち
+                                        if response is None:
+                                            raise Exception("No response received from page.goto")
+                                        status = response.status
+                                        html_content = await page.content()
 
-                                            # ベースと一致する場合
-                                            if matches_base:
-                                                if link not in self.seen:
-                                                    self.seen.add(link)
-                                                    await self.queue.put(
-                                                        (link, depth + 1)
-                                                    )
-                                                else:
-                                                    self.duplicate_count += 1
+                                    # レートリミット検知の判定
+                                    is_rate_limited = status == 429
 
-                                    except asyncio.CancelledError:
-                                        raise
-                                    except KeyboardInterrupt:
-                                        raise
-                                    except Exception as e:
-                                        # タイムアウトやその他のネットワークエラーに対する再試行
+                                    if is_rate_limited:
                                         retry_count += 1
-                                        if retry_count >= max_retries:
-                                            raise e  # 最大回数失敗した場合は大元のexceptに投げる
                                         print(
-                                            f"[一時エラー] 接続に失敗しました。再試行します ({retry_count}/{max_retries}): {e}"
+                                            f"[警告] レートリミット検知 ({retry_count}/{max_retries}回目試行): {unquote(current_url)}"
                                         )
-                                        # 簡易的なバックオフウェイト
-                                        await asyncio.sleep(2 * retry_count)
+                                        # 全ワーカーを止めて待機を実行する
+                                        await self.handle_rate_limit(current_url)
+                                        continue  # リトライループの先頭に戻って再試行
 
-                            except asyncio.CancelledError:
-                                raise
-                            except KeyboardInterrupt:
-                                raise
-                            except Exception as e:
-                                print(f"エラー発生 ({current_url}): {e}")
-                                self.visited.add(current_url)
-                            finally:
-                                if page:
-                                    await page.close()
-                                self.active_tasks -= 1
+                                    # 正常にページが取得できたら成功とする
+                                    success = True
+                                    self.visited.add(current_url)
+                                    self.build_tree_path(unquote(current_url))
 
-                                # 負荷軽減のためのウェイト
-                                if not getattr(self, "_stop_requested", False):
-                                    jitter_delay = random.uniform(
-                                        self.request_delay * 0.7,
-                                        self.request_delay * 1.3,
+                                    if self.markdown_mode:
+                                        await self.save_markdown(current_url, html_content)
+                                    
+                                    if self.html_mode:
+                                        await self.save_html(current_url, html_content)
+
+                                    # ページ内のURLを取得
+                                    links = self.extract_links(
+                                        html_content, current_url
                                     )
-                                    await asyncio.sleep(jitter_delay)
+                                    for link in links:
+                                        matches_base = (not self.base_urls) or any(
+                                            link.startswith(b)
+                                            for b in self.base_urls
+                                        )
+
+                                        # ベースと一致する場合
+                                        if matches_base:
+                                            if link not in self.seen:
+                                                self.seen.add(link)
+                                                await self.queue.put(
+                                                    (link, depth + 1)
+                                                )
+                                            else:
+                                                self.duplicate_count += 1
+
+                                except asyncio.CancelledError:
+                                    raise
+                                except KeyboardInterrupt:
+                                    raise
+                                except Exception as e:
+                                    # タイムアウトやその他のネットワークエラーに対する再試行
+                                    retry_count += 1
+                                    if retry_count >= max_retries:
+                                        raise e  # 最大回数失敗した場合は大元のexceptに投げる
+                                    print(
+                                        f"[一時エラー] 接続に失敗しました。再試行します ({retry_count}/{max_retries}): {e}"
+                                    )
+                                    # 簡易的なバックオフウェイト
+                                    await asyncio.sleep(2 * retry_count)
 
                         except asyncio.CancelledError:
                             raise
                         except KeyboardInterrupt:
                             raise
+                        except Exception as e:
+                            print(f"エラー発生 ({current_url}): {e}")
+                            self.visited.add(current_url)
+                        finally:
+                            if page:
+                                await page.close()
+
+                            # 負荷軽減のためのウェイト
+                            if not getattr(self, "_stop_requested", False):
+                                jitter_delay = random.uniform(
+                                    self.request_delay * 0.7,
+                                    self.request_delay * 1.3,
+                                )
+                                await asyncio.sleep(jitter_delay)
 
                 finally:
+                    self.active_tasks -= 1
                     # tryブロックに入った場合は必ず task_done() を呼び、キューのデッドロックを防ぐ
                     self.queue.task_done()
 
