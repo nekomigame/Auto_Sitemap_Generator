@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import asyncio
 import random
@@ -186,13 +187,16 @@ class SitemapCrawler:
                 os.makedirs(html_dir, exist_ok=True)
             parsed = urlparse(url)
             path = parsed.path.strip("/")
-            safe_name = path.replace("/", "_")
+            safe_name = re.sub(r'[\\/*?:"<>|]', '_', path)[:50]
             if not safe_name:
                 safe_name = "index"
+            hashed = hashlib.md5(url.encode('utf-8')).hexdigest()[:8]
+            filename = f"{safe_name}_{hashed}.html"
+            html_path = os.path.join(html_dir, filename)
             try:
-                with open(os.path.join(html_dir, f"{safe_name}.html"), "w", encoding="utf-8") as f:
+                with open(html_path, "w", encoding="utf-8") as f:
                     f.write(html_content)
-                    print(f"[HTML保存] {url}")
+                    print(f"[HTML保存] {html_path}")
             except Exception as e:
                 print(f"[HTML保存エラー] {url}: {e}")
                 
