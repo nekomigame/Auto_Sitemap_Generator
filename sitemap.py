@@ -31,6 +31,7 @@ class SitemapCrawler:
         backoff_delay=30,
         markdown_mode=False,
         stealth_mode=False,
+        html_mode=False
     ):
         # 開始するURL
         if isinstance(start_urls, str):
@@ -60,6 +61,7 @@ class SitemapCrawler:
         self.request_delay = request_delay  # リクエスト間のデフォルト遅延時間（秒）
         self.backoff_delay = backoff_delay  # レートリミット検知時の待機時間（秒）
         self.markdown_mode = markdown_mode
+        self.html_mode = html_mode
         self.stealth_mode = stealth_mode
         self.rate_limit_lock = asyncio.Lock()  # 重複して待機処理に入るのを防ぐロック
         self.rate_limit_event = (
@@ -175,6 +177,26 @@ class SitemapCrawler:
                     os.remove(tmp_path)
 
         await asyncio.to_thread(_convert_and_save)
+    
+    async def save_html(self, url, html_content):
+        def save():
+            BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+            html_dir = os.path.join(BASE_DIR, "html")
+            if not os.path.exists(html_dir):
+                os.makedirs(html_dir, exist_ok=True)
+            parsed = urlparse(url)
+            path = parsed.path.strip("/")
+            safe_name = path.replace("/", "_")
+            if not safe_name:
+                safe_name = "index"
+            try:
+                with open(os.path.join(html_dir, f"{safe_name}.html"), "w", encoding="utf-8") as f:
+                    f.write(html_content)
+                    print(f"[HTML保存] {url}")
+            except Exception as e:
+                print(f"[HTML保存エラー] {url}: {e}")
+                
+        await asyncio.to_thread(save)
 
     async def worker(self, session_or_context):
         """並列実行されるワーカー"""
@@ -284,6 +306,9 @@ class SitemapCrawler:
 
                                         if self.markdown_mode:
                                             await self.save_markdown(current_url, html_content)
+                                        
+                                        if self.html_mode:
+                                            await self.save_html(current_url, html_content)
 
                                         # ページ内のURLを取得
                                         links = self.extract_links(
