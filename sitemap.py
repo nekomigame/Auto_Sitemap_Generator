@@ -105,8 +105,11 @@ class SitemapCrawler:
         parsed = urlparse(url)
         path_parts = [p for p in parsed.path.split("/") if p]
         current_node = self.sitemap_tree
-        for part in path_parts:
-            current_node = current_node[part]
+        if not path_parts:
+            current_node["(index)"]
+        else:
+            for part in path_parts:
+                current_node = current_node[part]
 
     async def handle_rate_limit(self, triggered_url):
         """レートリミットを検知した際に、全ワーカーを一時停止させて一定時間待機する"""
