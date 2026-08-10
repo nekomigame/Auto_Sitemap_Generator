@@ -426,7 +426,13 @@ class SitemapCrawler:
             await self.queue.put((url, 0))
 
         if self.stealth_mode:
-            from scrapling.fetchers import AsyncStealthySession
+            try:
+                from scrapling.fetchers import AsyncStealthySession
+            except ImportError:
+                print("\n[エラー] stealth_mode が有効ですが、'scrapling' パッケージがインストールされていません。")
+                print("`pip install scrapling[all]` または `uv add scrapling[all]` でインストールしてください。\n")
+                return self.sitemap_tree
+
             async with AsyncStealthySession(headless=True) as session:
                 workers = [
                     asyncio.create_task(self.worker(session))
