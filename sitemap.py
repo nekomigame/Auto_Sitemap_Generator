@@ -289,6 +289,9 @@ class SitemapCrawler:
                             ):
                                 # 処理開始直前にも一時停止中ではないか確認
                                 await self.rate_limit_event.wait()
+                                if retry_count > 0:
+                                    # レートリミット解除後のワーカー一斉リクエスト（Thundering Herd）を防ぐためのランダムジッター
+                                    await asyncio.sleep(random.uniform(0.5, 2.5))
 
                                 try:
                                     if self.stealth_mode:
