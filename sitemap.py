@@ -272,11 +272,12 @@ class SitemapCrawler:
                         else:
                             page = await session_or_context.new_page()
                             if not self.markdown_mode:
-                                await page.route(
-                                    "**/*",
-                                    lambda route: route.continue_() if route.request.resource_type in [
-                                        "document", "script"] else route.abort()
-                                )
+                                async def handle_route(route):
+                                    if route.request.resource_type in ["document", "script"]:
+                                        await route.continue_()
+                                    else:
+                                        await route.abort()
+                                await page.route("**/*", handle_route)
                         try:
                             success = False
                             retry_count = 0
